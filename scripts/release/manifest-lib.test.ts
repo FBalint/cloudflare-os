@@ -13,7 +13,7 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { collectAssets, collectModules, stableStringify } from "./hash-lib.ts";
 import {
-  generateManifest, readDeployablePackages, readDeployInputs,
+  generateManifest, readDeployablePackages, readDeployInputs, releaseShortName,
 } from "./manifest-lib.ts";
 
 const RELEASE = dirname(fileURLToPath(import.meta.url));
@@ -184,6 +184,33 @@ test("worker entries carry the deploy contract", () => {
       assert.equal(mod.r2Key, `blobs/modules/${mod.sha256}`);
     }
   }
+});
+
+// The deploy wizard sends a gatekeeper's manifest shortName as the install slug verbatim, and
+// the slug becomes a GATEKEEPER_<SLUG> binding name, so the deploy service rejects anything
+// outside this charset (packages/deploy/src/naming.ts). A shortName that fails here reaches
+// customers as a redacted 500 on install with no workflow logs — fail the release build instead.
+const SLUG_RE = /^[a-z][a-z0-9]*$/;
+const MAX_SLUG_LEN = 20;
+
+test("every gatekeeper shortName is a legal deploy slug", () => {
+  const { workers } = buildTestManifest();
+  for (const [name, entry] of Object.entries(workers)) {
+    if (entry.kind !== "gatekeeper") continue;
+    assert.match(entry.shortName ?? "", SLUG_RE,
+        `${name}: shortName ${entry.shortName} is not a legal install slug; it must be ` +
+        `lowercase letters and digits starting with a letter (it becomes GATEKEEPER_<SLUG>)`);
+    assert.ok((entry.shortName ?? "").length <= MAX_SLUG_LEN,
+        `${name}: shortName ${entry.shortName} exceeds ${MAX_SLUG_LEN} chars`);
+    assert.equal(entry.vars.BASE_URL, `$PUBLIC_BASE_URL/gatekeeper/${entry.shortName}`,
+        `${name}: BASE_URL path must match shortName`);
+  }
+});
+
+test("releaseShortName folds package names into the slug charset", () => {
+  assert.equal(releaseShortName("gatekeeper-mcp-portal"), "mcpportal");
+  // No-op for names that already conform.
+  assert.equal(releaseShortName("gatekeeper-google"), "google");
 });
 
 test("per-package deploy-inputs.json files are well-formed when present", () => {

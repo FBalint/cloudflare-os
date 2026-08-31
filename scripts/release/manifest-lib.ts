@@ -327,6 +327,18 @@ export function gatekeeperShortName(pkgName: string): string {
   return pkgName.slice(GATEKEEPER_PREFIX.length);
 }
 
+/**
+ * The release manifest's shortName. Deployed instances bind gatekeepers as GATEKEEPER_<SLUG> and
+ * the router recovers the path from that binding name, so a slug must survive `toUpperCase()` and
+ * back — the deploy wizard restricts it to /^[a-z][a-z0-9]*$/ and sends the manifest shortName as
+ * the install slug verbatim. Package names are not so restricted (gatekeeper-mcp-portal), so fold
+ * here. Distinct from gatekeeperShortName(), which staging/preview use with GATEKEEPER_<PKG_NAME>
+ * bindings (underscores, router maps _ -> -) where a hyphen does round-trip.
+ */
+export function releaseShortName(pkgName: string): string {
+  return gatekeeperShortName(pkgName).replace(/[^a-z0-9]/g, "");
+}
+
 /** Read a package's `deploy-inputs.json`, or undefined if it declares none. */
 export function readDeployInputs(pkgDir: string): DeployInput[] | undefined {
   const path = join(pkgDir, "deploy-inputs.json");
@@ -439,7 +451,7 @@ export function buildWorkerEntry(
     // (default entrypoint — it forwards whole HTTP requests, not vendor RPC).
     gatekeeperBindingExpansion = { propsByPackage: {} };
   } else {
-    vars.BASE_URL = `$PUBLIC_BASE_URL/gatekeeper/${gatekeeperShortName(pkgName)}`;
+    vars.BASE_URL = `$PUBLIC_BASE_URL/gatekeeper/${releaseShortName(pkgName)}`;
     installable = !NOT_INSTALLABLE.has(pkgName);
     if (installable) {
       inputs = deployInputs ??
@@ -461,7 +473,7 @@ export function buildWorkerEntry(
 
   return {
     kind,
-    ...(kind === "gatekeeper" ? { shortName: gatekeeperShortName(pkgName) } : {}),
+    ...(kind === "gatekeeper" ? { shortName: releaseShortName(pkgName) } : {}),
     installable,
     ...(PREINSTALL.has(pkgName) ? { preinstall: true } : {}),
     ...(SINGLETON.has(pkgName) ? { singleton: true } : {}),
