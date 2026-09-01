@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   advanceToOAuth,
   claimOAuth,
+  clearOAuthBrowserCookie,
+  hasOAuthBrowserCookie,
+  oauthBrowserCookie,
   putInitiation,
   type ConnectNonceKv,
   type StoredNonce,
@@ -95,5 +98,38 @@ describe("two-stage connect handshake", () => {
     // ...and is single-use, so a replay of the same URL finds nothing.
     expect(claimOAuth(kv, "oauth", 100)).toBeNull();
     expect(kv.get("nonce")).toBeUndefined();
+  });
+});
+
+describe("OAuth browser binding", () => {
+  const nonce = "a".repeat(64);
+  const cookieName = `__Host-gatekeeper-oauth-${nonce}`;
+
+  it("binds the callback to the browser that started OAuth", () => {
+    expect(oauthBrowserCookie(nonce)).toBe(
+      `${cookieName}=1; Path=/; Max-Age=600; Secure; HttpOnly; SameSite=Lax`,
+    );
+    expect(hasOAuthBrowserCookie(new Request("https://workshop.example/oauth", {
+      headers: { Cookie: `other=x; ${cookieName}=1` },
+    }), nonce)).toBe(true);
+    expect(hasOAuthBrowserCookie(new Request("https://workshop.example/oauth"), nonce))
+      .toBe(false);
+    expect(hasOAuthBrowserCookie(new Request("https://workshop.example/oauth", {
+      headers: { Cookie: `${cookieName}=1` },
+    }), "b".repeat(64))).toBe(false);
+  });
+
+  it("expires the browser binding with the same host-only cookie attributes", () => {
+    expect(clearOAuthBrowserCookie(nonce)).toBe(
+      `${cookieName}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Lax`,
+    );
+  });
+
+  it("fails closed for malformed callback nonces", () => {
+    expect(() => oauthBrowserCookie("bad; Path=/")).toThrow("Invalid OAuth nonce");
+    expect(() => clearOAuthBrowserCookie("bad")).toThrow("Invalid OAuth nonce");
+    expect(hasOAuthBrowserCookie(new Request("https://workshop.example/oauth", {
+      headers: { Cookie: "__Host-gatekeeper-oauth-bad=1" },
+    }), "bad")).toBe(false);
   });
 });

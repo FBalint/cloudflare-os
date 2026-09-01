@@ -2,6 +2,7 @@ import {
   generateNonce,
   INITIATION_NONCE_LIFETIME_MS,
   isLiveNonce,
+  NONCE_BYTES,
   OAUTH_NONCE_LIFETIME_MS,
   type TimedNonce,
 } from "./connect-nonce";
@@ -16,6 +17,39 @@ export type ConnectNonceKv = {
 /** KV key holding the in-flight connect nonce. Unchanged from every current gatekeeper. */
 export const NONCE_KEY = "nonce";
 
+const OAUTH_COOKIE_PREFIX = "__Host-gatekeeper-oauth-";
+const NON_HEX = /[^0-9a-f]/;
+const OAUTH_COOKIE_MAX_AGE = Math.ceil(OAUTH_NONCE_LIFETIME_MS / 1000);
+const OAUTH_COOKIE_SECURITY = "Secure; HttpOnly; SameSite=Lax";
+
+function oauthCookieName(nonce: string): string | undefined {
+  if (nonce.length !== NONCE_BYTES * 2 || NON_HEX.test(nonce)) return undefined;
+  return OAUTH_COOKIE_PREFIX + nonce;
+}
+
+function requireOAuthCookieName(nonce: string): string {
+  const name = oauthCookieName(nonce);
+  if (!name) throw new TypeError("Invalid OAuth nonce.");
+  return name;
+}
+
+/** A `Set-Cookie` value binding the OAuth callback to the browser that began the redirect. */
+export function oauthBrowserCookie(nonce: string): string {
+  return `${requireOAuthCookieName(nonce)}=1; Path=/; Max-Age=${OAUTH_COOKIE_MAX_AGE}; ${OAUTH_COOKIE_SECURITY}`;
+}
+
+/** A `Set-Cookie` value expiring the browser binding after the OAuth callback. */
+export function clearOAuthBrowserCookie(nonce: string): string {
+  return `${requireOAuthCookieName(nonce)}=; Path=/; Max-Age=0; ${OAUTH_COOKIE_SECURITY}`;
+}
+
+/** Whether an OAuth callback carries the browser binding minted before its provider redirect. */
+export function hasOAuthBrowserCookie(req: Request, nonce: string): boolean {
+  const name = oauthCookieName(nonce);
+  if (!name) return false;
+  const expected = `${name}=1`;
+  return req.headers.get("cookie")?.split(";").some(value => value.trim() === expected) ?? false;
+}
 /** Stages in the two-step connect handshake. */
 export type ConnectStage = "initiation" | "oauth";
 
