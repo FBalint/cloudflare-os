@@ -479,8 +479,23 @@ export const ChatComposer = ({
     setIsSending(true);
     const draftSend = beginDraftSend();
     try {
+      let documentForSubmission = composerDocument;
+      if (!documentForSubmission.command && documentForSubmission.text.startsWith("//")) {
+        documentForSubmission = {
+          ...documentForSubmission,
+          text: documentForSubmission.text.slice(1),
+          capsules: documentForSubmission.capsules.map((capsule) => ({
+            ...capsule,
+            start: Math.max(0, capsule.start - 1),
+          })),
+          formats: documentForSubmission.formats.map((format) => ({
+            ...format,
+            start: Math.max(0, format.start - 1),
+          })),
+        };
+      }
       const submissionResult = buildComposerSubmission({
-        document: composerDocument,
+        document: documentForSubmission,
         hasAttachments: readyAttachments.length > 0,
       });
       if (!submissionResult.ok) {
