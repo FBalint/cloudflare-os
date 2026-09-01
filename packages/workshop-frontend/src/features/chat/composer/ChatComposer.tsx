@@ -479,23 +479,8 @@ export const ChatComposer = ({
     setIsSending(true);
     const draftSend = beginDraftSend();
     try {
-      let documentForSubmission = composerDocument;
-      if (!documentForSubmission.command && documentForSubmission.text.startsWith("//")) {
-        documentForSubmission = {
-          ...documentForSubmission,
-          text: documentForSubmission.text.slice(1),
-          capsules: documentForSubmission.capsules.map((capsule) => ({
-            ...capsule,
-            start: Math.max(0, capsule.start - 1),
-          })),
-          formats: documentForSubmission.formats.map((format) => ({
-            ...format,
-            start: Math.max(0, format.start - 1),
-          })),
-        };
-      }
       const submissionResult = buildComposerSubmission({
-        document: documentForSubmission,
+        document: composerDocument,
         hasAttachments: readyAttachments.length > 0,
       });
       if (!submissionResult.ok) {
@@ -1033,7 +1018,10 @@ export const ChatComposer = ({
                 {/* The deployment's standard formats. Picking one drops its name into the message at
                     the caret; the agent is told what to build from it. */}
                 {canChooseFormat && (
-                  <ComposerFormatMenuItems onSelect={(format) => void chooseFormat(format)} />
+                  <ComposerFormatMenuItems
+                    onSelect={(format) => void chooseFormat(format)}
+                    showTrailingSeparator={onToggleThinkingTraces !== undefined}
+                  />
                 )}
                 {onToggleThinkingTraces && (
                   <DropdownMenu.Item
