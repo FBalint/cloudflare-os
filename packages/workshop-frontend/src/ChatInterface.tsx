@@ -103,9 +103,7 @@ import { copyToClipboard } from "./clipboard";
 import { isImeComposing } from "./keyboardEvent";
 import { formatAttachmentSize } from "./features/chat/attachmentFormatting";
 import { ChatComposer } from "./features/chat/composer/ChatComposer";
-import {
-  composerDraftStorageKey,
-} from "./composerDraft";
+import { composerDraftStorageKey } from "./features/chat/composer/draft/composerDraft";
 
 export interface StreamingProposedChanges {
   updates: Uint8Array[];
