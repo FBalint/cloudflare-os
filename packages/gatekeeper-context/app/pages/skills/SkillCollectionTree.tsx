@@ -176,7 +176,7 @@ export const SkillCollectionTree = ({
   onSelectSkill: (root: SkillNavigatorRoot, skill: SkillNavigatorSkill) => void;
 }) => {
   const [expanded, setExpanded] = useState(
-    () => new Set(roots.map((root) => root.collection.id)),
+    () => new Set(),
   );
 
   const toggle = (path: string) => {
@@ -189,7 +189,7 @@ export const SkillCollectionTree = ({
   };
 
   return (
-    <LayerCard className="p-2">
+    <LayerCard className="p-1 bg-white">
       {roots.map((root) => {
         const rootPath = root.collection.id;
         const open = searchActive || expanded.has(rootPath);
