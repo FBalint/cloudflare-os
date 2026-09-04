@@ -1,4 +1,4 @@
-import { Button, Empty, LayerCard, SkeletonLine, Tabs, Text } from "@cloudflare/kumo";
+import { Button, Empty, SkeletonLine, Text } from "@cloudflare/kumo";
 import { CaretLeftIcon, FolderIcon, PathIcon, ScrollIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type {
@@ -8,6 +8,8 @@ import type {
 } from "../../../src/context-types";
 import { useContextApi } from "../../bridge";
 import { SkillDocumentContent } from "./SkillDocumentContent";
+import { SkillFileNavigator } from "./SkillFileNavigator";
+import { SkillPageTabs, skillPanelId, skillTabId } from "./SkillPageTabs";
 import type { SkillNavigatorSkill } from "./skillNavigatorModel";
 
 const directoryName = (path: string): string => {
@@ -33,26 +35,6 @@ const SkillPageLoading = () => (
   </div>
 );
 
-const SkillFiles = ({
-  documents,
-  directory,
-}: {
-  documents: ContextDocument[];
-  directory: string;
-}) => (
-  <LayerCard className="divide-y divide-kumo-hairline px-2 py-1">
-    {documents.map((document) => (
-      <div key={document.path} className="flex min-w-0 items-center gap-3 px-3 py-3">
-        <ScrollIcon aria-hidden="true" size={16} className="shrink-0 text-kumo-default" />
-        <div className="min-w-0 flex-1">
-          <Text size="sm" truncate>{displayPath(directory, document.path)}</Text>
-          <Text variant="secondary" size="xs" truncate>{document.contentType}</Text>
-        </div>
-      </div>
-    ))}
-  </LayerCard>
-);
-
 export const SkillPage = ({
   collection,
   skill,
@@ -67,6 +49,7 @@ export const SkillPage = ({
   const [documents, setDocuments] = useState<ContextDocument[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
+  const [previewDocument, setPreviewDocument] = useState<ContextDocument | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -144,45 +127,82 @@ export const SkillPage = ({
         </dl>
 
         <div className="mb-5">
-          <Tabs
-            variant="segmented"
+          <SkillPageTabs
             value={activeTab}
             onValueChange={setActiveTab}
             tabs={[
               { value: "overview", label: "Overview" },
-              { value: "files", label: `Files${documents ? ` (${readyDocuments.length})` : ""}` },
+              {
+                value: "files",
+                label: "Files",
+                ...(documents ? { badge: readyDocuments.length } : {}),
+              },
+              ...(previewDocument
+                ? [{
+                    value: "preview",
+                    label: displayPath(directory, previewDocument.path),
+                    closable: true,
+                  }]
+                : []),
             ]}
+            onClose={() => {
+              setPreviewDocument(null);
+              if (activeTab === "preview") setActiveTab("files");
+            }}
           />
         </div>
 
-        {documents === null && !loadFailed ? (
-          <SkillPageLoading />
-        ) : loadFailed ? (
-          <Empty
-            icon={<ScrollIcon size={48} className="text-kumo-inactive" />}
-            title="Skill could not be loaded"
-            description="Return to Skills and try again."
-          />
-        ) : readyDocuments.length === 0 ? (
-          <Empty
-            icon={<ScrollIcon size={48} className="text-kumo-inactive" />}
-            title="Skill files are unavailable"
-            description="The files may have moved since the skill list was loaded."
-          />
-        ) : activeTab === "overview" ? (
-          <div className="grid gap-5">
-            {readyDocuments.map((document) => (
-              <SkillDocumentContent
-                key={document.path}
-                collectionId={collection.id}
-                document={document}
-                displayPath={displayPath(directory, document.path)}
-              />
-            ))}
-          </div>
-        ) : (
-          <SkillFiles documents={readyDocuments} directory={directory} />
-        )}
+        <div
+          role="tabpanel"
+          id={skillPanelId(activeTab)}
+          aria-labelledby={skillTabId(activeTab)}
+          tabIndex={0}
+        >
+          {documents === null && !loadFailed ? (
+            <SkillPageLoading />
+          ) : loadFailed ? (
+            <Empty
+              icon={<ScrollIcon size={48} className="text-kumo-inactive" />}
+              title="Skill could not be loaded"
+              description="Return to Skills and try again."
+            />
+          ) : readyDocuments.length === 0 ? (
+            <Empty
+              icon={<ScrollIcon size={48} className="text-kumo-inactive" />}
+              title="Skill files are unavailable"
+              description="The files may have moved since the skill list was loaded."
+            />
+          ) : activeTab === "overview" ? (
+            <div className="grid gap-5">
+              {readyDocuments.map((document) => (
+                <SkillDocumentContent
+                  key={document.path}
+                  collectionId={collection.id}
+                  document={document}
+                  displayPath={displayPath(directory, document.path)}
+                />
+              ))}
+            </div>
+          ) : activeTab === "files" ? (
+            <SkillFileNavigator
+              documents={readyDocuments}
+              rootDirectory={directory}
+              activePath={previewDocument?.path ?? null}
+              onOpenFile={(path) => {
+                const document = readyDocuments.find((candidate) => candidate.path === path);
+                if (!document) return;
+                setPreviewDocument(document);
+                setActiveTab("preview");
+              }}
+            />
+          ) : previewDocument ? (
+            <SkillDocumentContent
+              collectionId={collection.id}
+              document={previewDocument}
+              displayPath={displayPath(directory, previewDocument.path)}
+            />
+          ) : null}
+        </div>
       </main>
     </div>
   );
