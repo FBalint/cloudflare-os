@@ -1,8 +1,8 @@
 import { Empty, InputGroup, SkeletonLine, Text } from "@cloudflare/kumo";
 import { BookOpenIcon, MagnifyingGlassIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import type { ContextDocumentSummary, EnabledCollectionInfo } from "../src/context-types";
-import { useContextApi } from "./bridge";
+import type { ContextDocumentSummary, EnabledCollectionInfo } from "../../../src/context-types";
+import { useContextApi } from "../../bridge";
 import { SkillCollectionTree } from "./SkillCollectionTree";
 import { SkillPage } from "./SkillPage";
 import {
@@ -61,6 +61,7 @@ const SkillsNavigatorPage = () => {
       <SkillPage
         collection={selectedSkill.root.collection}
         skill={selectedSkill.skill}
+        onBack={() => setSelectedSkill(null)}
       />
     );
   }

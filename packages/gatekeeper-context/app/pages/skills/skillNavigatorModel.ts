@@ -1,4 +1,4 @@
-import type { ContextDocumentSummary, EnabledCollectionInfo } from "../src/context-types";
+import type { ContextDocumentSummary, EnabledCollectionInfo } from "../../../src/context-types";
 
 export type SkillNavigatorSkill = {
   manifestPath: string;

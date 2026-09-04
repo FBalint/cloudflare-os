@@ -1,12 +1,12 @@
-import { Empty, LayerCard, SkeletonLine, Tabs, Text } from "@cloudflare/kumo";
-import { FolderIcon, PathIcon, ScrollIcon } from "@phosphor-icons/react";
+import { Button, Empty, LayerCard, SkeletonLine, Tabs, Text } from "@cloudflare/kumo";
+import { CaretLeftIcon, FolderIcon, PathIcon, ScrollIcon } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
 import type {
   ContextDocument,
   ContextDocumentSummary,
   EnabledCollectionInfo,
-} from "../src/context-types";
-import { useContextApi } from "./bridge";
+} from "../../../src/context-types";
+import { useContextApi } from "../../bridge";
 import { SkillDocumentContent } from "./SkillDocumentContent";
 import type { SkillNavigatorSkill } from "./skillNavigatorModel";
 
@@ -56,9 +56,11 @@ const SkillFiles = ({
 export const SkillPage = ({
   collection,
   skill,
+  onBack,
 }: {
   collection: EnabledCollectionInfo;
   skill: SkillNavigatorSkill;
+  onBack: () => void;
 }) => {
   const context = useContextApi();
   const directory = directoryName(skill.manifestPath);
@@ -104,7 +106,18 @@ export const SkillPage = ({
 
   return (
     <div className="h-full overflow-y-auto">
-      <main className="mx-auto w-full max-w-6xl px-5 pb-12 pt-8 sm:px-10 sm:pt-10">
+      <main className="mx-auto w-full max-w-5xl px-5 pb-12 pt-8 sm:px-10 sm:pt-10">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={onBack}
+          className="mb-5 -ml-2 text-kumo-subtle hover:text-kumo-default"
+        >
+          <CaretLeftIcon aria-hidden="true" size={12} />
+          Back to Skills
+        </Button>
+
         <header className="mb-8">
           <div className="flex min-w-0 items-center gap-3">
             <ScrollIcon aria-hidden="true" size={28} className="shrink-0 text-kumo-default" />

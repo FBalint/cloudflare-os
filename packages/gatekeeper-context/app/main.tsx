@@ -10,7 +10,7 @@ import type {
   GatekeeperAppTheme,
   GatekeeperAppThemeReceiver,
 } from '@gadgets/workshop-shared/theme'
-import SkillsNavigatorPage from './SkillsNavigatorPage'
+import SkillsNavigatorPage from './pages/skills/SkillsNavigatorPage'
 import { ContextApiProvider, PresentationProvider, type PresentAck } from './bridge'
 import { applyAppTheme } from './theme'
 import './styles.css'

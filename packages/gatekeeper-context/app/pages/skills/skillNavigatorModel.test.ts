@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ContextDocumentSummary, EnabledCollectionInfo } from "../src/context-types";
+import type { ContextDocumentSummary, EnabledCollectionInfo } from "../../../src/context-types";
 import { buildSkillNavigatorRoot, filterSkillNavigatorRoot } from "./skillNavigatorModel";
 
 const collection: EnabledCollectionInfo = {

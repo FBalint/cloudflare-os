@@ -3,9 +3,13 @@ import { FileIcon } from "@phosphor-icons/react";
 import { useEffect, useState, type ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import type { ContextDocument } from "../src/context-types";
-import { isImageContentType, isMarkdownContentType, isTextContentType } from "../src/context-types";
-import { useContextApi } from "./bridge";
+import type { ContextDocument } from "../../../src/context-types";
+import {
+  isImageContentType,
+  isMarkdownContentType,
+  isTextContentType,
+} from "../../../src/context-types";
+import { useContextApi } from "../../bridge";
 
 const directoryName = (path: string): string => {
   const index = path.lastIndexOf("/");
