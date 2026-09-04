@@ -19,6 +19,12 @@ export type SkillNavigatorRoot = {
   contents: SkillNavigatorCollection;
 };
 
+export const formatSkillName = (name: string): string =>
+  name
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+
 type MutableCollection = Omit<SkillNavigatorCollection, "collections" | "skillCount"> & {
   collections: Map<string, MutableCollection>;
 };

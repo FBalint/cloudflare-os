@@ -62,6 +62,9 @@ const SkillsNavigatorPage = () => {
         collection={selectedSkill.root.collection}
         skill={selectedSkill.skill}
         onBack={() => setSelectedSkill(null)}
+        onSkillChange={(skill) => {
+          setSelectedSkill((current) => current ? { ...current, skill } : null);
+        }}
       />
     );
   }

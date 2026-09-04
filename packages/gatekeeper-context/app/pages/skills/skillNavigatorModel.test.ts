@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ContextDocumentSummary, EnabledCollectionInfo } from "../../../src/context-types";
-import { buildSkillNavigatorRoot, filterSkillNavigatorRoot } from "./skillNavigatorModel";
+import {
+  buildSkillNavigatorRoot,
+  filterSkillNavigatorRoot,
+  formatSkillName,
+} from "./skillNavigatorModel";
 
 const collection: EnabledCollectionInfo = {
   id: "design",
@@ -20,6 +24,13 @@ const document = (
   contentType: "text/markdown",
   ...(options.skillName ? { skillName: options.skillName } : {}),
   lastUpdated: new Date("2026-01-01"),
+});
+
+describe("formatSkillName", () => {
+  it("turns the canonical kebab-case identifier into a display name", () => {
+    expect(formatSkillName("pdf-processing")).toBe("Pdf Processing");
+    expect(formatSkillName("code-review")).toBe("Code Review");
+  });
 });
 
 describe("buildSkillNavigatorRoot", () => {

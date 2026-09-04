@@ -1,6 +1,6 @@
-import { LayerCard, Text } from "@cloudflare/kumo";
-import { FileIcon } from "@phosphor-icons/react";
-import { useEffect, useState, type ComponentProps } from "react";
+import { Button, LayerCard, Text } from "@cloudflare/kumo";
+import { cn } from "@cloudflare/kumo/utils";
+import { useEffect, useLayoutEffect, useRef, useState, type ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ContextDocument } from "../../../src/context-types";
@@ -145,20 +145,75 @@ export const SkillDocumentContent = ({
   collectionId,
   document,
   displayPath,
+  onOpenFile,
 }: {
   collectionId: string;
   document: ContextDocument;
   displayPath: string;
-}) => (
-  <LayerCard className="overflow-hidden">
-    <div className="flex min-w-0 items-center gap-2 border-b border-kumo-hairline px-5 py-4">
-      <FileIcon aria-hidden="true" size={16} className="shrink-0 text-kumo-inactive" />
-      <Text as="h2" size="sm" truncate DANGEROUS_className="min-w-0 text-kumo-subtle">
-        {displayPath}
-      </Text>
-    </div>
-    <div className="min-w-0 px-5 py-6 sm:px-8 sm:py-8">
-      <DocumentBody collectionId={collectionId} document={document} />
-    </div>
-  </LayerCard>
-);
+  onOpenFile?: () => void;
+}) => {
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    if (!onOpenFile || !body) {
+      setIsOverflowing(false);
+      return;
+    }
+
+    const measure = () => setIsOverflowing(body.scrollHeight > body.clientHeight + 1);
+    const observer = new ResizeObserver(measure);
+    observer.observe(body);
+    for (const child of body.children) observer.observe(child);
+    measure();
+
+    return () => observer.disconnect();
+  }, [document.body, onOpenFile]);
+
+  return (
+    <LayerCard
+      className={cn(
+        "relative overflow-hidden bg-white",
+        onOpenFile && "hover:bg-kumo-elevated!",
+      )}
+    >
+      {onOpenFile ? (
+        <div className="flex h-10 min-w-0 items-center px-5 sm:px-8">
+          <Text as="h2" size="xs" truncate DANGEROUS_className="min-w-0 text-kumo-subtle">
+            {displayPath}
+          </Text>
+        </div>
+      ) : null}
+      <div
+        ref={bodyRef}
+        className={cn(
+          "min-w-0 px-5 py-6 sm:px-8 sm:py-8",
+          onOpenFile && "pt-0 sm:pt-0",
+          onOpenFile && "max-h-96 overflow-hidden",
+        )}
+      >
+        <DocumentBody collectionId={collectionId} document={document} />
+      </div>
+      {onOpenFile && (
+        <>
+          {isOverflowing && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-b from-transparent to-kumo-base"
+            />
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            aria-label={`Open ${displayPath}`}
+            onClick={onOpenFile}
+            className="absolute inset-0 z-20 h-full! w-full! cursor-pointer bg-transparent! p-0! hover:bg-transparent!"
+          >
+            <span className="sr-only">Open {displayPath}</span>
+          </Button>
+        </>
+      )}
+    </LayerCard>
+  );
+};

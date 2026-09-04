@@ -2987,12 +2987,18 @@ function renderDocumentBody({
 // Document Editor (right pane)
 // ---------------------------------------------------------------------------
 
-function DocumentEditor({
+export function DocumentEditor({
   collectionId,
   path,
   readOnly,
   initialMode = "read",
+  embedded = false,
+  externalBody,
+  hideDescription = false,
+  hideFilename = false,
+  preserveModeOnPathChange = false,
   onChanged,
+  onBodyChange,
   onRenamed,
   onRequestDelete,
   onDirtyChange,
@@ -3002,7 +3008,13 @@ function DocumentEditor({
   // Hide mutating controls and lock editors when true.
   readOnly: boolean;
   initialMode?: "read" | "edit";
+  embedded?: boolean;
+  externalBody?: string;
+  hideDescription?: boolean;
+  hideFilename?: boolean;
+  preserveModeOnPathChange?: boolean;
   onChanged: () => void;
+  onBodyChange?: (body: string) => void;
   // Parent re-selects + reloads after rename.
   onRenamed: (newPath: string) => void;
   onRequestDelete: () => void;
@@ -3057,7 +3069,9 @@ function DocumentEditor({
         setBody(d.body);
         setSkillName(d.skillName ?? null);
         setDirty(false);
-        setMode(readOnly || initialMode !== "edit" ? "read" : "edit");
+        if (!preserveModeOnPathChange) {
+          setMode(readOnly || initialMode !== "edit" ? "read" : "edit");
+        }
       }
       // Also clears loading for not-found.
       setLoading(false);
@@ -3073,6 +3087,16 @@ function DocumentEditor({
       cancelled = true;
     };
   }, [context, collectionId, path]);
+
+  useEffect(() => {
+    if (externalBody === undefined) return;
+    setBody(externalBody);
+    savedDocumentRef.current = {
+      description: extractDescription(contentType, externalBody) ?? description,
+      body: externalBody,
+    };
+    setDirty(false);
+  }, [externalBody]);
 
   const isText = isTextContentType(contentType);
   const isImage = isImageContentType(contentType);
@@ -3158,8 +3182,15 @@ function DocumentEditor({
 
   return (
     <div className="flex h-full flex-col bg-transparent">
-      <div className="flex h-14 shrink-0 items-center gap-3 border-b border-kumo-line px-6 sm:px-10">
+      <div
+        className={
+          embedded
+            ? "flex h-10 shrink-0 items-center gap-3 px-2"
+            : "flex h-14 shrink-0 items-center gap-3 border-b border-kumo-line px-6 sm:px-10"
+        }
+      >
         <div className="min-w-0 flex-1">
+          {!hideFilename && (
           <input
             value={filename}
             readOnly={readOnly || renaming}
@@ -3173,7 +3204,7 @@ function DocumentEditor({
             placeholder="file-name.md"
             title="File name — edit to rename (the extension sets the type)"
           />
-
+          )}
         </div>
         {/* Contextual actions sit left of the toggle so the always-present toggle/delete cluster
             stays right-anchored — toggling View/Edit never shifts the toggle. */}
@@ -3244,6 +3275,7 @@ function DocumentEditor({
 
       {/* "When to use this" — the agent-facing purpose (used for retrieval & search). Files that
           declare their own description show it read-only; otherwise the author writes it. */}
+      {!hideDescription && (
       <div className="border-b border-kumo-line px-6 py-3.5 sm:px-10">
         <label className="mb-1.5 block text-[12px] font-medium tracking-[-0.15px] text-kumo-subtle">
           When to use this
@@ -3284,6 +3316,7 @@ function DocumentEditor({
           </p>
         )}
       </div>
+      )}
 
       {/* Body — renders directly on the recessed panel (one cohesive surface, not a card in a card). */}
       <div className="min-h-0 flex-1 overflow-hidden">
@@ -3301,6 +3334,7 @@ function DocumentEditor({
           onBodyChange: (v) => {
             setBody(v);
             setDirty(documentIsDirty(description, v));
+            onBodyChange?.(v);
           },
         })}
       </div>

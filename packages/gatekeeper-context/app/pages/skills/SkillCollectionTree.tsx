@@ -12,6 +12,7 @@ import type {
   SkillNavigatorRoot,
   SkillNavigatorSkill,
 } from "./skillNavigatorModel";
+import { formatSkillName } from "./skillNavigatorModel";
 
 const COLLAPSIBLE_PANEL_CLASS_NAME = cn(
   "h-[var(--collapsible-panel-height)] overflow-hidden",
@@ -50,7 +51,7 @@ const SkillRow = ({
     variant="ghost"
     size="base"
     onClick={onSelect}
-    title={`${skill.name}\n${skill.description}\n${collectionTitle} · ${skill.manifestPath}`}
+    title={`${formatSkillName(skill.name)}\n${skill.description}\n${collectionTitle} · ${skill.manifestPath}`}
     className="!flex !h-auto min-h-11 w-full items-center justify-start gap-3 py-2.5 pr-3 text-left"
     style={{ paddingLeft: `${nestedPaddingLeft(depth)}px` }}
   >
@@ -62,7 +63,7 @@ const SkillRow = ({
         truncate
         DANGEROUS_className="min-w-0 shrink-0 sm:max-w-[35%]"
       >
-        {skill.name}
+        {formatSkillName(skill.name)}
       </Text>
       <CaretRightIcon
         aria-hidden="true"
