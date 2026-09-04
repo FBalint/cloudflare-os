@@ -166,9 +166,26 @@ would need the parent's refs, setters, and synchronization callbacks to function
 
 ## Kumo And Styling
 
+Before implementing or reviewing product UI, use the installed Kumo CLI: run `pnpm exec kumo ai`
+for usage and tokens, `pnpm exec kumo ls` for discovery, and
+`pnpm exec kumo doc <Component>` for selected APIs. The installed package is authoritative; do not
+fetch web documentation unless its CLI, registry, and declarations leave a required question
+unresolved. Do not rely on remembered APIs or infer conventions from legacy UI.
+
 Use Kumo components and Kumo semantic design tokens by default. Check Kumo before creating a custom
 control, interaction pattern, or visual primitive. Existing Workshop wrappers may be used when they
 provide established application behavior that Kumo does not provide directly.
+
+Use Kumo components for the complete interaction they own, not merely as styled replacements for
+native controls. For example, use `Collapsible` for disclosures, `Empty` for empty states,
+`SkeletonLine` for loading placeholders, and `Text` for product typography. Prefer component props
+and variants over overriding their visual styles. If Kumo lacks required behavior, identify the
+specific gap before introducing a custom implementation.
+
+CFOS uses 13px as its base product font size. Use `size="sm"` on Kumo `Text`, or `text-sm` for
+product-local text, almost everywhere. This is only a typography rule: keep controls on Kumo's
+`size="base"` component variant. Reserve larger font sizes for headings and other deliberate
+hierarchy; use smaller font sizes only for genuinely secondary metadata.
 
 Custom colors and design tokens outside Kumo are prohibited unless the user explicitly requests
 them. In particular, do not add:
@@ -185,6 +202,11 @@ not be introduced or changed as part of ordinary feature work.
 Legacy custom tokens and color declarations in the current codebase are not precedent for new code.
 Do not expand their use. Migrate them only as part of explicitly scoped cleanup.
 
+Choose Kumo semantic tokens by the element's role, not by the color they currently render. Follow
+the surface hierarchy and text, status, border, and ring roles documented by
+`pnpm exec kumo ai`. Do not use raw palette colors, `dark:` variants, or visual token substitutions
+that happen to look correct in one theme.
+
 Tailwind remains appropriate for structure: layout, spacing, sizing, positioning, responsive
 behavior, and typography. Use custom CSS only for technical behavior that Kumo and utilities cannot
 express, such as editor integration or measured overlays; custom CSS does not relax the color and
@@ -192,6 +214,11 @@ token rules.
 
 When a Kumo component is unsuitable, record the concrete behavioral or accessibility gap before
 adding a shared Workshop abstraction. Do not wrap Kumo solely to restyle it.
+
+## Icons
+
+Import the current `*Icon` component names from `@phosphor-icons/react`, such as `ArrowIcon`, rather
+than deprecated unsuffixed names such as `Arrow`.
 
 ## React
 

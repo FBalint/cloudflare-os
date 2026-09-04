@@ -10,7 +10,7 @@ import type {
   GatekeeperAppTheme,
   GatekeeperAppThemeReceiver,
 } from '@gadgets/workshop-shared/theme'
-import ContextLibraryPage from './ContextLibraryPage'
+import SkillsNavigatorPage from './SkillsNavigatorPage'
 import { ContextApiProvider, PresentationProvider, type PresentAck } from './bridge'
 import { applyAppTheme } from './theme'
 import './styles.css'
@@ -56,7 +56,7 @@ function main() {
       <PresentationProvider setPresenting={(active) => host.setPresenting(active)}>
         <TooltipProvider>
           <Toasty>
-            <ContextLibraryPage />
+            <SkillsNavigatorPage />
           </Toasty>
         </TooltipProvider>
       </PresentationProvider>
