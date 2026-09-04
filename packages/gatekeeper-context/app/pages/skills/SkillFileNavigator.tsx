@@ -1,11 +1,13 @@
-import { Button, Collapsible, Input, LayerCard, Text } from "@cloudflare/kumo";
+import { Button, Collapsible, DropdownMenu, Input, LayerCard, Text } from "@cloudflare/kumo";
 import { cn } from "@cloudflare/kumo/utils";
 import {
   CaretDownIcon,
   CaretRightIcon,
   FileTextIcon,
   ImageIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
+import type { ReactElement } from "react";
 import { useEffect, useRef, useState } from "react";
 import type { ContextDocument } from "../../../src/context-types";
 import { isImageContentType } from "../../../src/context-types";
@@ -29,11 +31,15 @@ type TreeActions = {
   dragPath: string | null;
   dragOverDirectory: string | null;
   expanded: Set<string>;
+  contextPath: string | null;
   renamingPath: string | null;
   renameValue: string;
   onDragStart: (path: string) => void;
   onDragEnd: () => void;
   onDragOverDirectory: (path: string | null) => void;
+  onContextClose: () => void;
+  onContextOpen: (path: string) => void;
+  onDeleteRequest: (path: string, kind: "file" | "folder") => void;
   onMove: (fromPath: string, targetDirectory: string) => void;
   onOpenFile: (path: string) => void;
   onRenameValueChange: (value: string) => void;
@@ -139,6 +145,33 @@ const RenameInput = ({ depth, isFile, actions }: {
   </div>
 );
 
+const ItemContextMenu = ({ path, kind, canDelete = true, actions, trigger }: {
+  path: string;
+  kind: "file" | "folder";
+  canDelete?: boolean;
+  actions: TreeActions;
+  trigger: ReactElement;
+}) => (
+  <DropdownMenu
+    open={actions.contextPath === path}
+    onOpenChange={(open) => {
+      if (!open) actions.onContextClose();
+    }}
+  >
+    <DropdownMenu.Trigger render={trigger} />
+    <DropdownMenu.Content align="start">
+      <DropdownMenu.Item
+        variant="danger"
+        disabled={!canDelete}
+        icon={TrashIcon}
+        onClick={() => actions.onDeleteRequest(path, kind)}
+      >
+        Delete
+      </DropdownMenu.Item>
+    </DropdownMenu.Content>
+  </DropdownMenu>
+);
+
 const FileRow = ({ file, depth, actions }: {
   file: SkillFile;
   depth: number;
@@ -153,31 +186,39 @@ const FileRow = ({ file, depth, actions }: {
   }
 
   return (
-    <Button
-      draggable={actions.canEdit && !protectedManifest}
-      type="button"
-      variant="ghost"
-      size="sm"
-      onClick={() => actions.onOpenFile(file.sourcePath)}
-      onDoubleClick={() => {
-        if (!protectedManifest && actions.canEdit) actions.onRenameStart(file.path, file.name);
-      }}
-      onDragStart={() => actions.onDragStart(file.path)}
-      onDragEnd={actions.onDragEnd}
-      className={cn(
-        "mb-0.5 !flex !h-7 w-full min-w-0 justify-start gap-2 pr-1.5 text-left",
-        active && "bg-kumo-recessed",
-      )}
-      style={{ paddingLeft: `${protectedManifest ? 8 : treePadding(depth, true)}px` }}
-      title={file.path}
-    >
-      <Icon
-        aria-hidden="true"
-        size={14}
-        className={cn("shrink-0", active ? "text-kumo-default" : "text-kumo-subtle")}
-      />
-      <Text as="span" size="sm" bold={active} truncate>{file.name}</Text>
-    </Button>
+    <ItemContextMenu
+      path={file.path}
+      kind="file"
+      canDelete={actions.canEdit && !protectedManifest}
+      actions={actions}
+      trigger={
+        <Button
+          draggable={actions.canEdit && !protectedManifest}
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => actions.onOpenFile(file.sourcePath)}
+          icon={Icon}
+          onContextMenu={(event) => {
+            event.preventDefault();
+            actions.onContextOpen(file.path);
+          }}
+          onDoubleClick={() => {
+            if (!protectedManifest && actions.canEdit) actions.onRenameStart(file.path, file.name);
+          }}
+          onDragStart={() => actions.onDragStart(file.path)}
+          onDragEnd={actions.onDragEnd}
+          className={cn(
+            "mb-0.5 !flex !h-7 w-full min-w-0 justify-start gap-2 pr-1.5 text-left",
+            active && "bg-kumo-recessed",
+          )}
+          style={{ paddingLeft: `${protectedManifest ? 8 : treePadding(depth, true)}px` }}
+          title={file.path}
+        >
+          <Text as="span" size="sm" bold={active} truncate>{file.name}</Text>
+        </Button>
+      }
+    />
   );
 };
 
@@ -197,7 +238,16 @@ const FolderBranch = ({ folder, depth, actions }: {
       {actions.renamingPath === folder.path ? (
         <RenameInput depth={depth} isFile={false} actions={actions} />
       ) : (
-        <div
+        <ItemContextMenu
+          path={folder.path}
+          kind="folder"
+          canDelete={actions.canEdit}
+          actions={actions}
+          trigger={<div
+          onContextMenu={(event) => {
+            event.preventDefault();
+            actions.onContextOpen(folder.path);
+          }}
           onDragOver={(event) => {
             if (!actions.canEdit || !actions.dragPath) return;
             event.preventDefault();
@@ -244,7 +294,8 @@ const FolderBranch = ({ folder, depth, actions }: {
             )}
             <Text as="span" size="sm" bold truncate>{folder.name}</Text>
           </Collapsible.Trigger>
-        </div>
+        </div>}
+        />
       )}
       <Collapsible.Panel className={COLLAPSIBLE_PANEL_CLASS_NAME}>
         <div>
@@ -269,6 +320,7 @@ export const SkillFileNavigator = ({
   onOpenFile,
   onMovePath,
   onRenamePath,
+  onRequestDelete,
 }: {
   documents: ContextDocument[];
   rootDirectory: string;
@@ -278,10 +330,12 @@ export const SkillFileNavigator = ({
   onOpenFile: (path: string) => void;
   onMovePath: (fromPath: string, targetDirectory: string) => void;
   onRenamePath: (path: string, name: string) => Promise<boolean>;
+  onRequestDelete: (path: string, kind: "file" | "folder") => void;
 }) => {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [dragPath, setDragPath] = useState<string | null>(null);
   const [dragOverDirectory, setDragOverDirectory] = useState<string | null>(null);
+  const [contextPath, setContextPath] = useState<string | null>(null);
   const [renamingPath, setRenamingPath] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const openTimerRef = useRef<number | null>(null);
@@ -305,6 +359,7 @@ export const SkillFileNavigator = ({
   const actions: TreeActions = {
     activePath,
     canEdit,
+    contextPath,
     dragPath,
     dragOverDirectory,
     expanded,
@@ -313,6 +368,12 @@ export const SkillFileNavigator = ({
     onDragStart: setDragPath,
     onDragEnd: endDrag,
     onDragOverDirectory: setDragOverDirectory,
+    onContextClose: () => setContextPath(null),
+    onContextOpen: setContextPath,
+    onDeleteRequest: (path, kind) => {
+      setContextPath(null);
+      onRequestDelete(path, kind);
+    },
     onMove: (fromPath, targetDirectory) => {
       onMovePath(fromPath, targetDirectory);
       endDrag();

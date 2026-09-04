@@ -157,9 +157,9 @@ function dataUri(contentType: string, base64Body: string): string {
   return `data:${contentType};base64,${base64Body}`;
 }
 
-const DEFAULT_COLLECTION_ICON = "📚";
+export const DEFAULT_COLLECTION_ICON = "📚";
 
-function IconPickerButton({
+export function IconPickerButton({
   value,
   onChange,
   size = 32,
@@ -2916,6 +2916,7 @@ function MarkdownPreview({
 }
 
 type DocumentBodyRenderProps = {
+  autoFocus: boolean;
   body: string;
   collectionId: string;
   contentType: string;
@@ -2930,6 +2931,7 @@ type DocumentBodyRenderProps = {
 };
 
 function renderDocumentBody({
+  autoFocus,
   body,
   collectionId,
   contentType,
@@ -2975,6 +2977,7 @@ function renderDocumentBody({
 
   return (
     <SourceEditor
+      autoFocus={autoFocus}
       value={body}
       path={path}
       readOnly={readOnly || mode === "read"}
@@ -2993,6 +2996,7 @@ export function DocumentEditor({
   readOnly,
   canDelete = true,
   initialMode = "read",
+  autoFocus = false,
   embedded = false,
   externalBody,
   hideDescription = false,
@@ -3010,6 +3014,7 @@ export function DocumentEditor({
   readOnly: boolean;
   canDelete?: boolean;
   initialMode?: "read" | "edit";
+  autoFocus?: boolean;
   embedded?: boolean;
   externalBody?: string;
   hideDescription?: boolean;
@@ -3323,6 +3328,7 @@ export function DocumentEditor({
       {/* Body — renders directly on the recessed panel (one cohesive surface, not a card in a card). */}
       <div className="min-h-0 flex-1 overflow-hidden">
         {renderDocumentBody({
+          autoFocus: autoFocus && mode === "edit",
           body,
           collectionId,
           contentType,
@@ -3509,11 +3515,13 @@ function languageForPath(path: string): Extension {
 // CodeMirror source editor (Monaco doesn't run in this sandbox). Soft-wrap keeps prose-heavy source
 // readable. Markdown uses MarkdownPreview in View mode; everything else uses this for both modes.
 function SourceEditor({
+  autoFocus,
   value,
   onChange,
   readOnly,
   path,
 }: {
+  autoFocus?: boolean;
   value: string;
   onChange: (v: string) => void;
   readOnly?: boolean;
@@ -3559,6 +3567,10 @@ function SourceEditor({
       }),
     });
     viewRef.current = view;
+    if (autoFocus && !readOnly) {
+      view.dispatch({ selection: { anchor: view.state.doc.length } });
+      view.focus();
+    }
     return () => {
       view.destroy();
       viewRef.current = null;

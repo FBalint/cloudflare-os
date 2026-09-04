@@ -13,6 +13,7 @@ import {
 import { cn } from "@cloudflare/kumo/utils";
 import {
   CaretLeftIcon,
+  DotsThreeIcon,
   FilePlusIcon,
   FolderIcon,
   FolderOpenIcon,
@@ -20,9 +21,17 @@ import {
   PathIcon,
   PlusIcon,
   ScrollIcon,
+  TrashIcon,
   UploadSimpleIcon,
 } from "@phosphor-icons/react";
-import { useEffect, useEffectEvent, useRef, useState } from "react";
+import {
+  type ComponentProps,
+  forwardRef,
+  useEffect,
+  useEffectEvent,
+  useRef,
+  useState,
+} from "react";
 import { motion, useAnimate, useReducedMotion } from "motion/react";
 import { parseDocument } from "yaml";
 import type {
@@ -42,7 +51,12 @@ import { useContextApi, usePresentWhileOpen } from "../../bridge";
 import { SkillDocumentContent } from "./SkillDocumentContent";
 import { SkillFileNavigator } from "./SkillFileNavigator";
 import { SkillPageTabs, skillPanelId, skillTabId } from "./SkillPageTabs";
-import { formatSkillName, type SkillNavigatorSkill } from "./skillNavigatorModel";
+import {
+  buildSkillNavigatorRoot,
+  formatSkillName,
+  type SkillNavigatorRoot,
+  type SkillNavigatorSkill,
+} from "./skillNavigatorModel";
 
 const directoryName = (path: string): string => {
   const index = path.lastIndexOf("/");
@@ -58,6 +72,17 @@ const joinPath = (...parts: string[]): string => parts.filter(Boolean).join("/")
 
 const replacePathPrefix = (path: string, from: string, to: string): string =>
   path === from ? to : path.startsWith(`${from}/`) ? to + path.slice(from.length) : path;
+
+const SkillActionsIcon = forwardRef<SVGSVGElement, ComponentProps<typeof DotsThreeIcon>>(
+  (props, ref) => <DotsThreeIcon {...props} ref={ref} weight="bold" />,
+);
+SkillActionsIcon.displayName = "SkillActionsIcon";
+
+type PendingDelete = {
+  path: string;
+  kind: "file" | "folder" | "skill";
+  label?: string;
+};
 
 const fileToBase64 = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -117,12 +142,16 @@ const SkillPageLoading = () => (
 export const SkillPage = ({
   collection,
   skill,
+  initialEdit = false,
   onBack,
+  onDeleted,
   onSkillChange,
 }: {
   collection: EnabledCollectionInfo;
   skill: SkillNavigatorSkill;
+  initialEdit?: boolean;
   onBack: () => void;
+  onDeleted: (root: SkillNavigatorRoot) => void;
   onSkillChange: (skill: SkillNavigatorSkill) => void;
 }) => {
   const context = useContextApi();
@@ -134,8 +163,10 @@ export const SkillPage = ({
   const [reloadVersion, setReloadVersion] = useState(0);
   const [activeTab, setActiveTab] = useState("overview");
   const [previewDocument, setPreviewDocument] = useState<ContextDocument | null>(null);
-  const [editOnOpenPath, setEditOnOpenPath] = useState<string | null>(null);
-  const [pendingDeletePath, setPendingDeletePath] = useState<string | null>(null);
+  const [editOnOpenPath, setEditOnOpenPath] = useState<string | null>(
+    initialEdit ? skill.manifestPath : null,
+  );
+  const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [nameInput, setNameInput] = useState(() => formatSkillName(skill.name));
@@ -159,7 +190,7 @@ export const SkillPage = ({
   const [creating, setCreating] = useState(false);
   const [titleScope, animateTitle] = useAnimate();
   const reduceMotion = useReducedMotion();
-  const deletePresentation = usePresentWhileOpen(pendingDeletePath !== null);
+  const deletePresentation = usePresentWhileOpen(pendingDelete !== null);
   const createPresentation = usePresentWhileOpen(createKind !== null);
 
   const revealCanonicalName = useEffectEvent(async (name: string) => {
@@ -375,6 +406,7 @@ export const SkillPage = ({
         readOnly={!canEditDocuments}
         canDelete={document.path !== skill.manifestPath}
         initialMode={editOnOpenPath === document.path ? "edit" : "read"}
+        autoFocus={initialEdit && document.path === skill.manifestPath}
         embedded
         externalBody={document.path === skill.manifestPath ? savedManifestBody ?? undefined : undefined}
         hideDescription
@@ -401,28 +433,56 @@ export const SkillPage = ({
           });
           setReloadVersion((version) => version + 1);
         }}
-        onRequestDelete={() => setPendingDeletePath(document.path)}
+        onRequestDelete={() => setPendingDelete({ path: document.path, kind: "file" })}
       />
     </LayerCard>
   );
 
   const deleteDocument = async () => {
-    if (!pendingDeletePath) return;
+    if (!pendingDelete) return;
+    const { path, kind } = pendingDelete;
     setDeleting(true);
     try {
-      await context.deleteContextDocument(collection.id, pendingDeletePath);
-      toasts.add({ title: "Document deleted", variant: "success" });
-      const deletedManifest = pendingDeletePath === skill.manifestPath;
-      setPendingDeletePath(null);
-      setPreviewDocument(null);
+      const paths = kind === "folder" || kind === "skill"
+        ? readyDocuments
+            .map((document) => document.path)
+            .filter((documentPath) =>
+              kind === "skill" && path === skill.manifestPath
+                ? documentPath === path
+                : documentPath.startsWith(`${path}/`)
+            )
+        : [path];
+      await runWithConcurrency(paths, 6, (documentPath) =>
+        context.deleteContextDocument(collection.id, documentPath)
+      );
+      toasts.add({
+        title: kind === "skill" ? "Skill deleted" : kind === "folder" ? "Folder deleted" : "Document deleted",
+        variant: "success",
+      });
+      const deletedManifest = kind === "skill" || path === skill.manifestPath;
+      const relativeDeletedPath = displayPath(directory, path);
+      setPendingFolders((current) => new Set(
+        [...current].filter((folder) =>
+          folder !== relativeDeletedPath && !folder.startsWith(`${relativeDeletedPath}/`)
+        ),
+      ));
+      setPendingDelete(null);
+      setPreviewDocument((current) => current && (
+        current.path === path || current.path.startsWith(`${path}/`)
+      ) ? null : current);
       if (deletedManifest) {
-        onBack();
+        const summaries: ContextDocumentSummary[] =
+          await context.listContextDocuments(collection.id);
+        onDeleted(buildSkillNavigatorRoot(collection, summaries));
       } else {
         setActiveTab("files");
         setReloadVersion((version) => version + 1);
       }
     } catch {
-      toasts.add({ title: "Failed to delete document", variant: "error" });
+      toasts.add({
+        title: `Failed to delete ${kind === "file" ? "document" : kind}`,
+        variant: "error",
+      });
     } finally {
       setDeleting(false);
     }
@@ -636,8 +696,14 @@ export const SkillPage = ({
     <DropdownMenu>
       <DropdownMenu.Trigger
         render={
-          <Button type="button" variant="ghost" size="base" disabled={uploading || dirty}>
-            <PlusIcon aria-hidden="true" size={16} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="base"
+            disabled={uploading || dirty}
+            icon={PlusIcon}
+            className="text-sm!"
+          >
             Add new
           </Button>
         }
@@ -649,7 +715,7 @@ export const SkillPage = ({
         onClick={(event) => event.stopPropagation()}
       >
         <DropdownMenu.Item
-          icon={<FilePlusIcon aria-hidden="true" size={14} />}
+          icon={FilePlusIcon}
           onClick={(event) => {
             event.stopPropagation();
             openCreate("file");
@@ -658,7 +724,7 @@ export const SkillPage = ({
           New file
         </DropdownMenu.Item>
         <DropdownMenu.Item
-          icon={<FolderPlusIcon aria-hidden="true" size={14} />}
+          icon={FolderPlusIcon}
           onClick={(event) => {
             event.stopPropagation();
             openCreate("folder");
@@ -668,7 +734,7 @@ export const SkillPage = ({
         </DropdownMenu.Item>
         <DropdownMenu.Separator />
         <DropdownMenu.Item
-          icon={<UploadSimpleIcon aria-hidden="true" size={14} />}
+          icon={UploadSimpleIcon}
           onClick={(event) => {
             event.stopPropagation();
             requestUpload("", "files");
@@ -677,7 +743,7 @@ export const SkillPage = ({
           Upload files
         </DropdownMenu.Item>
         <DropdownMenu.Item
-          icon={<FolderOpenIcon aria-hidden="true" size={14} />}
+          icon={FolderOpenIcon}
           onClick={(event) => {
             event.stopPropagation();
             requestUpload("", "folder");
@@ -721,9 +787,9 @@ export const SkillPage = ({
         size="base"
         disabled={uploading || dirty}
         onClick={() => openCreate("file")}
+        icon={FilePlusIcon}
         className="h-28! w-full! flex-col justify-center gap-1 text-center"
       >
-        <FilePlusIcon aria-hidden="true" size={18} />
         <span className="text-sm font-medium text-kumo-default">
           {uploading ? "Uploading..." : "Add new"}
         </span>
@@ -739,26 +805,28 @@ export const SkillPage = ({
   return (
     <div className="h-full overflow-y-auto">
       <Dialog.Root
-        open={pendingDeletePath !== null && deletePresentation.presenting}
+        open={pendingDelete !== null && deletePresentation.presenting}
         onOpenChange={(open) => {
-          if (!open && !deleting) setPendingDeletePath(null);
+          if (!open && !deleting) setPendingDelete(null);
         }}
         onOpenChangeComplete={deletePresentation.onOpenChangeComplete}
       >
         <Dialog size="sm" className="p-0">
           <div className="p-6">
-            <Dialog.Title>Delete document</Dialog.Title>
+            <Dialog.Title>Delete {pendingDelete?.kind ?? "item"}</Dialog.Title>
             <Dialog.Description>
-              Permanently delete {pendingDeletePath ? fileName(pendingDeletePath) : "this document"}?
-              This cannot be undone.
+              Permanently delete {pendingDelete?.label ?? (pendingDelete ? fileName(pendingDelete.path) : "this item")}
+              {pendingDelete?.kind === "folder" || pendingDelete?.kind === "skill"
+                ? " and everything inside it"
+                : ""}? This cannot be undone.
             </Dialog.Description>
           </div>
           <div className="flex justify-end gap-2 border-t border-kumo-line px-6 py-3">
-            <Button variant="secondary" disabled={deleting} onClick={() => setPendingDeletePath(null)}>
+            <Button variant="secondary" disabled={deleting} onClick={() => setPendingDelete(null)}>
               Cancel
             </Button>
             <Button variant="destructive" loading={deleting} onClick={deleteDocument}>
-              Delete document
+              Delete {pendingDelete?.kind ?? "item"}
             </Button>
           </div>
         </Dialog>
@@ -842,9 +910,9 @@ export const SkillPage = ({
           variant="ghost"
           size="sm"
           onClick={onBack}
+          icon={CaretLeftIcon}
           className="mb-5 -ml-2 text-kumo-subtle hover:text-kumo-default"
         >
-          <CaretLeftIcon aria-hidden="true" size={12} />
           Back to Skills
         </Button>
 
@@ -880,6 +948,34 @@ export const SkillPage = ({
                 )}
               />
             </motion.div>
+            <DropdownMenu>
+              <DropdownMenu.Trigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="base"
+                    aria-label="Skill actions"
+                    icon={SkillActionsIcon}
+                    className="h-8! w-8! shrink-0 justify-center px-0! text-kumo-subtle hover:text-kumo-default"
+                  />
+                }
+              />
+              <DropdownMenu.Content align="end">
+                <DropdownMenu.Item
+                  variant="danger"
+                  disabled={!canEditDocuments || dirty}
+                  icon={TrashIcon}
+                  onClick={() => setPendingDelete({
+                    path: directory || skill.manifestPath,
+                    kind: "skill",
+                    label: formatSkillName(skill.name),
+                  })}
+                >
+                  Delete
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu>
           </div>
           <InputArea
             aria-label="Skill description"
@@ -1000,6 +1096,10 @@ export const SkillPage = ({
               canEdit={canEditDocuments === true}
               onMovePath={(fromPath, targetDirectory) => void movePath(fromPath, targetDirectory)}
               onRenamePath={renamePath}
+              onRequestDelete={(path, kind) => setPendingDelete({
+                path: joinPath(directory, path),
+                kind,
+              })}
               onOpenFile={(path) => {
                 const document = readyDocuments.find((candidate) => candidate.path === path);
                 if (!document) return;

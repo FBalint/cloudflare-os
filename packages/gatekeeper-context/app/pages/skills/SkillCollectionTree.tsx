@@ -1,10 +1,11 @@
-import { Button, Collapsible, LayerCard, Text } from "@cloudflare/kumo";
+import { Button, Collapsible, DropdownMenu, LayerCard, Text } from "@cloudflare/kumo";
 import { cn } from "@cloudflare/kumo/utils";
 import {
   CaretDownIcon,
   CaretRightIcon,
   FolderIcon,
   ScrollIcon,
+  TrashIcon,
 } from "@phosphor-icons/react";
 import { useState } from "react";
 import type {
@@ -39,55 +40,81 @@ const SkillRow = ({
   skill,
   collectionTitle,
   depth,
+  contextOpen,
+  canDelete,
   onSelect,
+  onContextOpen,
+  onContextClose,
+  onRequestDelete,
 }: {
   skill: SkillNavigatorSkill;
   collectionTitle: string;
   depth: number;
+  contextOpen: boolean;
+  canDelete: boolean;
   onSelect: () => void;
+  onContextOpen: () => void;
+  onContextClose: () => void;
+  onRequestDelete: () => void;
 }) => (
-  <Button
-    type="button"
-    variant="ghost"
-    size="base"
-    onClick={onSelect}
-    title={`${formatSkillName(skill.name)}\n${skill.description}\n${collectionTitle} · ${skill.manifestPath}`}
-    className="!flex !h-auto min-h-11 w-full items-center justify-start gap-3 py-2.5 pr-3 text-left"
-    style={{ paddingLeft: `${nestedPaddingLeft(depth)}px` }}
+  <DropdownMenu
+    open={contextOpen}
+    onOpenChange={(open) => {
+      if (!open) onContextClose();
+    }}
   >
-    <ScrollIcon aria-hidden="true" size={16} className="shrink-0 text-kumo-default" />
-    <span className="flex min-w-0 flex-1 items-center gap-2">
-      <Text
-        as="span"
-        size="sm"
-        truncate
-        DANGEROUS_className="min-w-0 shrink-0 sm:max-w-[35%]"
+    <DropdownMenu.Trigger
+      render={<Button
+        type="button"
+        variant="ghost"
+        size="base"
+        onClick={onSelect}
+        icon={ScrollIcon}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          onContextOpen();
+        }}
+        title={`${formatSkillName(skill.name)}\n${skill.description}\n${collectionTitle} · ${skill.manifestPath}`}
+        className="!flex !h-auto min-h-11 w-full items-center justify-start gap-3 py-2.5 pr-3 text-left"
+        style={{ paddingLeft: `${nestedPaddingLeft(depth)}px` }}
       >
-        {formatSkillName(skill.name)}
-      </Text>
-      <CaretRightIcon
-        aria-hidden="true"
-        size={11}
-        className="shrink-0 text-kumo-inactive"
-      />
-      <Text
-        as="span"
-        variant="secondary"
-        size="sm"
-        truncate
-        DANGEROUS_className="min-w-0 flex-1"
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <Text
+            as="span"
+            size="sm"
+            truncate
+            DANGEROUS_className="min-w-0 shrink-0 sm:max-w-[35%]"
+          >
+            {formatSkillName(skill.name)}
+          </Text>
+          <CaretRightIcon
+            aria-hidden="true"
+            size={11}
+            className="shrink-0 text-kumo-inactive"
+          />
+          <Text
+            as="span"
+            variant="secondary"
+            size="sm"
+            truncate
+            DANGEROUS_className="min-w-0 flex-1 font-normal"
+          >
+            {skill.description}
+          </Text>
+        </span>
+      </Button>}
+    />
+    <DropdownMenu.Content align="start">
+      <DropdownMenu.Item
+        variant="danger"
+        disabled={!canDelete}
+        icon={TrashIcon}
+        onClick={onRequestDelete}
       >
-        {skill.description}
-      </Text>
-    </span>
-    <Text
-      as="span"
-      size="xs"
-      DANGEROUS_className="max-w-[30%] shrink-0 truncate text-kumo-inactive"
-    >
-      {collectionTitle} · {skill.manifestPath}
-    </Text>
-  </Button>
+        Delete
+      </DropdownMenu.Item>
+    </DropdownMenu.Content>
+  </DropdownMenu>
 );
 
 type CollectionBranchProps = {
@@ -97,8 +124,13 @@ type CollectionBranchProps = {
   depth: number;
   expanded: Set<string>;
   searchActive: boolean;
+  contextPath: string | null;
+  canDelete: boolean;
   onToggle: (path: string) => void;
   onSelectSkill: (skill: SkillNavigatorSkill) => void;
+  onContextOpen: (path: string) => void;
+  onContextClose: () => void;
+  onRequestDelete: (skill: SkillNavigatorSkill) => void;
 };
 
 const CollectionBranch = ({
@@ -108,8 +140,13 @@ const CollectionBranch = ({
   depth,
   expanded,
   searchActive,
+  contextPath,
+  canDelete,
   onToggle,
   onSelectSkill,
+  onContextOpen,
+  onContextClose,
+  onRequestDelete,
 }: CollectionBranchProps) => {
   const nodeId = `${rootId}/${collection.path}`;
   const open = searchActive || expanded.has(nodeId);
@@ -147,8 +184,13 @@ const CollectionBranch = ({
               depth={depth + 1}
               expanded={expanded}
               searchActive={searchActive}
+              contextPath={contextPath}
+              canDelete={canDelete}
               onToggle={onToggle}
               onSelectSkill={onSelectSkill}
+              onContextOpen={onContextOpen}
+              onContextClose={onContextClose}
+              onRequestDelete={onRequestDelete}
             />
           ))}
           {collection.skills.map((skill) => (
@@ -157,7 +199,12 @@ const CollectionBranch = ({
               skill={skill}
               collectionTitle={rootTitle}
               depth={depth + 1}
+              contextOpen={contextPath === `${rootId}/${skill.manifestPath}`}
+              canDelete={canDelete}
               onSelect={() => onSelectSkill(skill)}
+              onContextOpen={() => onContextOpen(`${rootId}/${skill.manifestPath}`)}
+              onContextClose={onContextClose}
+              onRequestDelete={() => onRequestDelete(skill)}
             />
           ))}
         </div>
@@ -169,15 +216,26 @@ const CollectionBranch = ({
 export const SkillCollectionTree = ({
   roots,
   searchActive,
+  canDeleteSkill,
+  canDeleteCollection,
   onSelectSkill,
+  onRequestDelete,
+  onRequestDeleteCollection,
+  onAddSkill,
 }: {
   roots: SkillNavigatorRoot[];
   searchActive: boolean;
+  canDeleteSkill: (root: SkillNavigatorRoot) => boolean;
+  canDeleteCollection: (root: SkillNavigatorRoot) => boolean;
   onSelectSkill: (root: SkillNavigatorRoot, skill: SkillNavigatorSkill) => void;
+  onRequestDelete: (root: SkillNavigatorRoot, skill: SkillNavigatorSkill) => void;
+  onRequestDeleteCollection: (root: SkillNavigatorRoot) => void;
+  onAddSkill: (root: SkillNavigatorRoot) => void;
 }) => {
   const [expanded, setExpanded] = useState(
     () => new Set<string>(),
   );
+  const [contextPath, setContextPath] = useState<string | null>(null);
 
   const toggle = (path: string) => {
     setExpanded((current) => {
@@ -200,33 +258,73 @@ export const SkillCollectionTree = ({
             open={open}
             onOpenChange={() => toggle(rootPath)}
           >
-            <Collapsible.Trigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="base"
-                  className="!flex !h-auto min-h-12 w-full justify-start gap-2 px-3 text-left"
-                />
-              }
+            <DropdownMenu
+              open={contextPath === `${rootPath}/collection`}
+              onOpenChange={(open) => {
+                if (!open) setContextPath(null);
+              }}
             >
-              <CollectionCaret open={open} />
-              {root.collection.icon ? (
-                <span
-                  aria-hidden="true"
-                  className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden whitespace-nowrap text-base leading-none"
+              <DropdownMenu.Trigger
+                render={<div
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setContextPath(`${rootPath}/collection`);
+                  }}
+                />}
+              >
+                <Collapsible.Trigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="base"
+                      className="!flex !h-auto min-h-12 w-full justify-start gap-2 px-3 text-left"
+                    />
+                  }
                 >
-                  {root.collection.icon}
-                </span>
-              ) : (
-                <FolderIcon size={19} className="shrink-0 text-kumo-subtle" />
-              )}
-              <Text as="span" size="sm" bold truncate DANGEROUS_className="flex-1">
-                {root.collection.title}
-              </Text>
-              <Text as="span" size="xs" DANGEROUS_className="tabular-nums text-kumo-inactive">
-                {root.contents.skillCount}
-              </Text>
-            </Collapsible.Trigger>
+                  <CollectionCaret open={open} />
+                  {root.collection.icon ? (
+                    <span
+                      aria-hidden="true"
+                      className="grid h-6 w-6 shrink-0 place-items-center overflow-hidden whitespace-nowrap text-base leading-none"
+                    >
+                      {root.collection.icon}
+                    </span>
+                  ) : (
+                    <FolderIcon size={19} className="shrink-0 text-kumo-subtle" />
+                  )}
+                  <Text as="span" size="sm" bold truncate DANGEROUS_className="flex-1">
+                    {root.collection.title}
+                  </Text>
+                  <Text as="span" size="xs" DANGEROUS_className="tabular-nums text-kumo-inactive">
+                    {root.contents.skillCount}
+                  </Text>
+                </Collapsible.Trigger>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="start">
+                <DropdownMenu.Item
+                  icon={ScrollIcon}
+                  disabled={!canDeleteSkill(root)}
+                  onClick={() => {
+                    setContextPath(null);
+                    onAddSkill(root);
+                  }}
+                >
+                  Add skill
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item
+                  variant="danger"
+                  disabled={!canDeleteCollection(root)}
+                  icon={TrashIcon}
+                  onClick={() => {
+                    setContextPath(null);
+                    onRequestDeleteCollection(root);
+                  }}
+                >
+                  Delete
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu>
 
             <Collapsible.Panel className={COLLAPSIBLE_PANEL_CLASS_NAME}>
               <div>
@@ -239,8 +337,16 @@ export const SkillCollectionTree = ({
                     depth={0}
                     expanded={expanded}
                     searchActive={searchActive}
+                    contextPath={contextPath}
+                    canDelete={canDeleteSkill(root)}
                     onToggle={toggle}
                     onSelectSkill={(skill) => onSelectSkill(root, skill)}
+                    onContextOpen={setContextPath}
+                    onContextClose={() => setContextPath(null)}
+                    onRequestDelete={(skill) => {
+                      setContextPath(null);
+                      onRequestDelete(root, skill);
+                    }}
                   />
                 ))}
                 {root.contents.skills.map((skill) => (
@@ -249,7 +355,15 @@ export const SkillCollectionTree = ({
                     skill={skill}
                     collectionTitle={root.collection.title}
                     depth={0}
+                    contextOpen={contextPath === `${root.collection.id}/${skill.manifestPath}`}
+                    canDelete={canDeleteSkill(root)}
                     onSelect={() => onSelectSkill(root, skill)}
+                    onContextOpen={() => setContextPath(`${root.collection.id}/${skill.manifestPath}`)}
+                    onContextClose={() => setContextPath(null)}
+                    onRequestDelete={() => {
+                      setContextPath(null);
+                      onRequestDelete(root, skill);
+                    }}
                   />
                 ))}
               </div>
