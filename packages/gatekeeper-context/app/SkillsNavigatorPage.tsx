@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import type { ContextDocumentSummary, EnabledCollectionInfo } from "../src/context-types";
 import { useContextApi } from "./bridge";
 import { SkillCollectionTree } from "./SkillCollectionTree";
+import { SkillPage } from "./SkillPage";
 import {
   buildSkillNavigatorRoot,
   filterSkillNavigatorRoot,
@@ -15,6 +16,10 @@ const SkillsNavigatorPage = () => {
   const [roots, setRoots] = useState<SkillNavigatorRoot[] | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedSkill, setSelectedSkill] = useState<{
+    root: SkillNavigatorRoot;
+    skill: SkillNavigatorRoot["contents"]["skills"][number];
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +55,15 @@ const SkillsNavigatorPage = () => {
       const filtered = filterSkillNavigatorRoot(root, search);
       return filtered ? [filtered] : [];
     }) ?? [];
+
+  if (selectedSkill) {
+    return (
+      <SkillPage
+        collection={selectedSkill.root.collection}
+        skill={selectedSkill.skill}
+      />
+    );
+  }
 
   return (
     <div className="mx-auto flex h-full w-full max-w-5xl flex-col px-5 sm:px-10">
@@ -94,7 +108,11 @@ const SkillsNavigatorPage = () => {
               }
             />
           ) : (
-            <SkillCollectionTree roots={visibleRoots} searchActive={search.trim().length > 0} />
+            <SkillCollectionTree
+              roots={visibleRoots}
+              searchActive={search.trim().length > 0}
+              onSelectSkill={(root, skill) => setSelectedSkill({ root, skill })}
+            />
           )}
         </div>
       </div>

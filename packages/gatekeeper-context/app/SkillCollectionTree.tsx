@@ -38,14 +38,20 @@ const SkillRow = ({
   skill,
   collectionTitle,
   depth,
+  onSelect,
 }: {
   skill: SkillNavigatorSkill;
   collectionTitle: string;
   depth: number;
+  onSelect: () => void;
 }) => (
-  <div
+  <Button
+    type="button"
+    variant="ghost"
+    size="base"
+    onClick={onSelect}
     title={`${skill.name}\n${skill.description}\n${collectionTitle} · ${skill.manifestPath}`}
-    className="flex min-h-11 w-full items-center gap-3 rounded-lg py-2.5 pr-3 text-left"
+    className="!flex !h-auto min-h-11 w-full items-center justify-start gap-3 py-2.5 pr-3 text-left"
     style={{ paddingLeft: `${nestedPaddingLeft(depth)}px` }}
   >
     <ScrollIcon aria-hidden="true" size={16} className="shrink-0 text-kumo-default" />
@@ -80,7 +86,7 @@ const SkillRow = ({
     >
       {collectionTitle} · {skill.manifestPath}
     </Text>
-  </div>
+  </Button>
 );
 
 type CollectionBranchProps = {
@@ -91,6 +97,7 @@ type CollectionBranchProps = {
   expanded: Set<string>;
   searchActive: boolean;
   onToggle: (path: string) => void;
+  onSelectSkill: (skill: SkillNavigatorSkill) => void;
 };
 
 const CollectionBranch = ({
@@ -101,6 +108,7 @@ const CollectionBranch = ({
   expanded,
   searchActive,
   onToggle,
+  onSelectSkill,
 }: CollectionBranchProps) => {
   const nodeId = `${rootId}/${collection.path}`;
   const open = searchActive || expanded.has(nodeId);
@@ -139,6 +147,7 @@ const CollectionBranch = ({
               expanded={expanded}
               searchActive={searchActive}
               onToggle={onToggle}
+              onSelectSkill={onSelectSkill}
             />
           ))}
           {collection.skills.map((skill) => (
@@ -147,6 +156,7 @@ const CollectionBranch = ({
               skill={skill}
               collectionTitle={rootTitle}
               depth={depth + 1}
+              onSelect={() => onSelectSkill(skill)}
             />
           ))}
         </div>
@@ -158,9 +168,11 @@ const CollectionBranch = ({
 export const SkillCollectionTree = ({
   roots,
   searchActive,
+  onSelectSkill,
 }: {
   roots: SkillNavigatorRoot[];
   searchActive: boolean;
+  onSelectSkill: (root: SkillNavigatorRoot, skill: SkillNavigatorSkill) => void;
 }) => {
   const [expanded, setExpanded] = useState(
     () => new Set(roots.map((root) => root.collection.id)),
@@ -227,6 +239,7 @@ export const SkillCollectionTree = ({
                     expanded={expanded}
                     searchActive={searchActive}
                     onToggle={toggle}
+                    onSelectSkill={(skill) => onSelectSkill(root, skill)}
                   />
                 ))}
                 {root.contents.skills.map((skill) => (
@@ -235,6 +248,7 @@ export const SkillCollectionTree = ({
                     skill={skill}
                     collectionTitle={root.collection.title}
                     depth={0}
+                    onSelect={() => onSelectSkill(root, skill)}
                   />
                 ))}
               </div>
