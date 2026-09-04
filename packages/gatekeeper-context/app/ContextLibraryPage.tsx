@@ -2991,6 +2991,7 @@ export function DocumentEditor({
   collectionId,
   path,
   readOnly,
+  canDelete = true,
   initialMode = "read",
   embedded = false,
   externalBody,
@@ -3007,6 +3008,7 @@ export function DocumentEditor({
   path: string;
   // Hide mutating controls and lock editors when true.
   readOnly: boolean;
+  canDelete?: boolean;
   initialMode?: "read" | "edit";
   embedded?: boolean;
   externalBody?: string;
@@ -3258,7 +3260,7 @@ export function DocumentEditor({
             ))}
           </div>
         )}
-        {!readOnly && (
+        {!readOnly && canDelete && (
           <>
           {/* Separate the destructive action from Save so it can't be fat-fingered. */}
           <span className="mx-0.5 h-5 w-px shrink-0 bg-kumo-line" aria-hidden="true" />

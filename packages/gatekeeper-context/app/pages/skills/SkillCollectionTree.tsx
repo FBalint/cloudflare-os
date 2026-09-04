@@ -176,7 +176,7 @@ export const SkillCollectionTree = ({
   onSelectSkill: (root: SkillNavigatorRoot, skill: SkillNavigatorSkill) => void;
 }) => {
   const [expanded, setExpanded] = useState(
-    () => new Set(),
+    () => new Set<string>(),
   );
 
   const toggle = (path: string) => {

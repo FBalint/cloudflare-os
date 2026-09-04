@@ -173,16 +173,26 @@ export const SkillDocumentContent = ({
 
   return (
     <LayerCard
+      onClick={onOpenFile ? (event) => {
+        if ((event.target as HTMLElement).closest("a, button, input, textarea, select")) return;
+        onOpenFile();
+      } : undefined}
       className={cn(
         "relative overflow-hidden bg-white",
-        onOpenFile && "hover:bg-kumo-elevated!",
+        onOpenFile && "cursor-pointer hover:bg-kumo-elevated!",
       )}
     >
       {onOpenFile ? (
         <div className="flex h-10 min-w-0 items-center px-5 sm:px-8">
-          <Text as="h2" size="xs" truncate DANGEROUS_className="min-w-0 text-kumo-subtle">
-            {displayPath}
-          </Text>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={onOpenFile}
+            className="-ml-2 min-w-0 justify-start text-kumo-subtle hover:text-kumo-default"
+          >
+            <span className="truncate">{displayPath}</span>
+          </Button>
         </div>
       ) : null}
       <div
@@ -196,23 +206,12 @@ export const SkillDocumentContent = ({
         <DocumentBody collectionId={collectionId} document={document} />
       </div>
       {onOpenFile && (
-        <>
-          {isOverflowing && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-b from-transparent to-kumo-base"
-            />
-          )}
-          <Button
-            type="button"
-            variant="ghost"
-            aria-label={`Open ${displayPath}`}
-            onClick={onOpenFile}
-            className="absolute inset-0 z-20 h-full! w-full! cursor-pointer bg-transparent! p-0! hover:bg-transparent!"
-          >
-            <span className="sr-only">Open {displayPath}</span>
-          </Button>
-        </>
+        isOverflowing && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-20 bg-gradient-to-b from-transparent to-kumo-base"
+          />
+        )
       )}
     </LayerCard>
   );
